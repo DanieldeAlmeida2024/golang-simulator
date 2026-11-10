@@ -1,0 +1,16 @@
+@startuml
+title golang-simulator - componentes conceituais
+actor Operador
+component "Entrada" as Entrada
+component "Servicos" as Servico
+component "Rota" as Dominio
+database "Persistencia / broker" as Banco
+Operador --> Entrada
+Entrada --> Servico
+Servico --> Dominio
+Dominio --> Banco : integração quando aplicável
+note bottom of Dominio
+Visão conceitual.
+Validar contra tipos reais do código.
+end note
+@enduml
