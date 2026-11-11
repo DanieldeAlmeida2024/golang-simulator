@@ -49,3 +49,10 @@ Rode o comando para executar o projeto:
 ```
 go run cmd/simulator/main.go
 ```
+
+## Documentação técnica específica
+
+- [Projeto e eventos](docs/projeto/ESPECIFICACAO.md)
+- [UML](docs/uml/README.md)
+- [Testes](docs/testes/PLANO_DE_TESTES.md)
+- [Versão](docs/controle/VERSIONAMENTO.md)
