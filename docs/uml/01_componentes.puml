@@ -1,17 +1,17 @@
 @startuml
-component "cmd/simulator" as Main
-component "EventHub" as Hub
-component "RouteService" as Routes
+queue "Kafka route" as In
+component "main.go Kafka Reader" as Main
+component "EventHub.HandleEvent" as Hub
+component "RouteService" as Route
 component "FreightService" as Freight
-database "MongoDB routes.routes" as Mongo
-queue "Kafka route" as Input
-queue "Kafka freight" as F
-queue "Kafka simulation" as S
-Main --> Input
-Input --> Hub
-Hub --> Routes
-Routes --> Freight
-Routes --> Mongo
-Hub --> F
-Hub --> S
+database "MongoDB routes.routes" as DB
+queue "Kafka freight" as OutF
+queue "Kafka simulation" as OutS
+In --> Main
+Main --> Hub
+Hub --> Route
+Route --> Freight
+Route --> DB
+Hub --> OutF
+Hub --> OutS
 @enduml

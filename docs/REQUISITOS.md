@@ -1,3 +1,3 @@
-# Requisitos Go
+# Requisitos individuais
 
-[Especificação](projeto/ESPECIFICACAO.md) · [testes](testes/PLANO_DE_TESTES.md).
+[Especificação real](projeto/ESPECIFICACAO.md).

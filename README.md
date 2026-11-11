@@ -56,3 +56,7 @@ go run cmd/simulator/main.go
 - [UML](docs/uml/README.md)
 - [Testes](docs/testes/PLANO_DE_TESTES.md)
 - [Versão](docs/controle/VERSIONAMENTO.md)
+
+## Documentação técnica específica
+
+[Projeto](docs/projeto/ESPECIFICACAO.md) · [UML](docs/uml/README.md) · [Testes](docs/testes/PLANO_DE_TESTES.md) · [Versionamento](docs/controle/VERSIONAMENTO.md)

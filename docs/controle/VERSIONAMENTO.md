@@ -1,7 +1,11 @@
-# Controle documental — Go Simulator
+# Controle de versões — golang-simulator
 
-**GO-SIM 1.0.0** em 11/11/2026, commit de referência `bb46a6831ff6c5586d69c1113c52e9dd6b5348a2`.
+**1.0.0**, 11/11/2026. Referência de código: `3aa74e2463f17d3138fd7a105809e7d6f20b9997`.
 
-[Projeto](../projeto/ESPECIFICACAO.md) · [UML](../uml/README.md) · [Testes](../testes/PLANO_DE_TESTES.md).
+| Artefato | Versão | Link |
+|---|---|---|
+| Especificação | 1.0.0 | [Projeto](../projeto/ESPECIFICACAO.md) |
+| Diagramas | 1.0.0 | [UML](../uml/README.md) |
+| Testes | 1.0.0 | [Plano](../testes/PLANO_DE_TESTES.md) |
 
-MAJOR: contrato de evento/frete; MINOR: eventos ou cenários novos; PATCH: editorial. Atualizar evidências por SHA de código e infraestrutura.
+MAJOR: contrato quebrado, MINOR: fluxo novo, PATCH: revisão editorial. Evidências associadas ao SHA do código.

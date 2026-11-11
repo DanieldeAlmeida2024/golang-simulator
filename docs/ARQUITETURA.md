@@ -1,3 +1,3 @@
-# Arquitetura Go
+# Arquitetura individual
 
-[Projeto e mensageria](projeto/ESPECIFICACAO.md) · [UML](uml/README.md).
+[Diagramas UML próprios](uml/README.md).

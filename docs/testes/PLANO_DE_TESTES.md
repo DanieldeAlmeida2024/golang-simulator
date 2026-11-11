@@ -1,32 +1,25 @@
-# Plano de testes — Go Simulator
+# Testes — Simulador Go de rotas, fretes e coordenadas
 
-> **GO-SIM v1.0.0** · 11/11/2026 · código `bb46a6831ff6c5586d69c1113c52e9dd6b5348a2` · análise estática; resultados pendentes.
+**Documento v1.0.0**, 11/11/2026, base `3aa74e2463f17d3138fd7a105809e7d6f20b9997`. Testes propostos não foram executados neste PR.
 
-## Cobertura observada
-Não há `*_test.go` no inventário atual. O teste `tests/test_documentacao.py` verifica somente a documentação; não valida Go, Mongo ou Kafka.
-
-| ID | Prioridade | Caso | Resultado esperado |
+| ID | Ação | Critério de aceite | Situação |
 |---|---|---|---|
-| GO-01 | P0 | FreightService 0,1,120 | Valor correto pela fórmula e arredondamento |
-| GO-02 | P0 | RouteCreated JSON válido | Upsert e FreightCalculated com route_id |
-| GO-03 | P0 | DeliveryStarted sem rota | Erro e nenhuma simulação |
-| GO-04 | P0 | Evento desconhecido | Erro `unknown event type` |
-| GO-05 | P0 | JSON malformado | Erro de deserialização sem crash |
-| GO-06 | P0 | Mongo com contexto nil | Corrigir/validar uso de contexto e timeout |
-| GO-07 | P0 | 3 direções com 1s de intervalo | 3 DriverMoved no tópico simulation |
-| GO-08 | P0 | Kafka indisponível ao publicar frete | Falha observável/retry, sem perda silenciosa |
-| GO-09 | P0 | Crash entre ReadMessage e HandleEvent | Replay sem perda de rota |
-| GO-10 | P1 | Eventos concorrentes para mesma rota | Sem goroutines vazando e com ordem definida |
-| GO-11 | P1 | SIGTERM durante simulação | Desligamento controlado de canais/brokers |
-| GO-12 | P1 | Compose com dependências de pastas irmãs | Mongo/Kafka resolvidos por DNS |
-| GO-13 | P1 | Distância negativa/grande | Política de limite explícita |
+| GO-01 | Calcular frete 0,1,120 | Fórmula e arredondamento corretos | Planejado |
+| GO-02 | RouteCreated válido | Upsert Mongo + FreightCalculated no tópico freight | Planejado |
+| GO-03 | DeliveryStarted válido | Emissão de um DriverMoved por coordenada | Planejado |
+| GO-04 | Intervalo de 1s e timeout 500ms | Detectar terminação precoce do consumidor | Planejado |
+| GO-05 | Evento desconhecido | HandleEvent retorna erro | Planejado |
+| GO-06 | Mensagem JSON inválida | Erro de unmarshal controlado | Planejado |
+| GO-07 | MongoDB indisponível | Erro sem confirmação indevida | Planejado |
+| GO-08 | Falha do producer freight | Erro propagado, sem sucesso aparente | Planejado |
+| GO-09 | Restart após leitura Kafka | Reprocessamento/idempotência sem perda | Planejado |
+| GO-10 | SIGTERM durante a rota | Canais e writers finalizados | Planejado |
+| GO-11 | Compose sem pastas irmãs | Erro de includes reconhecido | Planejado |
+| GO-12 | Frete com distância negativa | Regra de negócio validada e documentada | Planejado |
 
-## Execução de referência
+## Execução e evidências
 ```bash
-go test ./...
-go vet ./...
-go build ./cmd/simulator
-docker compose config
+go test ./... && go vet ./...
 ```
 
-Os testes de integração devem usar Mongo e Kafka isolados, confirmar quantos eventos chegaram e registrar SHA, ambientes, logs sem dados sensíveis e resultado. Os 13 casos acima permanecem **não executados** até produção de evidência.
+Teste de unidade não substitui E2E. Para simulação distribuída, usar MongoDB/Kafka descartáveis e stubs de API; para frontend, testar socket com dados sintéticos. Guardar SHA, ambiente, entradas, retorno, logs sem segredo e resultado por ID. Casos P0 são bloqueantes até evidência explícita.

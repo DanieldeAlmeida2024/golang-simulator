@@ -1,5 +1,5 @@
-# UML — simulador Go
+# UML — Simulador Go de rotas, fretes e coordenadas
 
-> **GO-SIM v1.0.0** · 11/11/2026 · código `bb46a6831ff6c5586d69c1113c52e9dd6b5348a2` · análise estática; resultados pendentes.
+**Documento v1.0.0**, 11/11/2026, base `3aa74e2463f17d3138fd7a105809e7d6f20b9997`. Testes propostos não foram executados neste PR.
 
-Diagramas: [componentes](01_componentes.puml), [eventos](02_eventos.puml), [simulação](03_sequencia_simulacao.puml).
+[Componentes](01_componentes.puml) · [Sequência crítica](02_sequencia.puml).

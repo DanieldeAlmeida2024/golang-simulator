@@ -1,0 +1,18 @@
+@startuml
+actor Simulador
+participant EventHub
+participant DeliveryStartedHandler as Handler
+participant "Goroutine 1s" as G
+queue "Kafka simulation" as K
+Simulador -> EventHub : DeliveryStarted
+EventHub -> Handler : handleDeliveryStarted
+Handler -> G : start(rota.directions)
+loop coordenadas
+G -> EventHub : chDriverMoved
+EventHub -> K : WriteMessages
+end
+note bottom
+Consumer do canal expira em 500ms,
+mas produtor emite a cada 1s.
+end note
+@enduml

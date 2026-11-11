@@ -1,3 +1,3 @@
-# Testes Go
+# Testes individuais
 
-[Casos e execução](testes/PLANO_DE_TESTES.md).
+[Matriz de testes](testes/PLANO_DE_TESTES.md).
