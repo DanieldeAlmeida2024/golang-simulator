@@ -1,0 +1,17 @@
+@startuml
+component "cmd/simulator" as Main
+component "EventHub" as Hub
+component "RouteService" as Routes
+component "FreightService" as Freight
+database "MongoDB routes.routes" as Mongo
+queue "Kafka route" as Input
+queue "Kafka freight" as F
+queue "Kafka simulation" as S
+Main --> Input
+Input --> Hub
+Hub --> Routes
+Routes --> Freight
+Routes --> Mongo
+Hub --> F
+Hub --> S
+@enduml

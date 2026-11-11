@@ -1,0 +1,14 @@
+@startuml
+class Route { ID: string; Distance: int; Directions[]; FreightPrice: float64 }
+class Directions { Lat: float64; Lng: float64 }
+class RouteCreatedEvent { EventName; RouteID; Distance; Directions[] }
+class DeliveryStartedEvent { EventName; RouteID }
+class FreightCalculatedEvent { EventName; RouteID; Amount }
+class DriverMovedEvent { EventName; RouteID; Lat; Lng }
+class EventHub { HandleEvent(msg): error }
+Route o-- Directions
+EventHub --> RouteCreatedEvent
+EventHub --> DeliveryStartedEvent
+EventHub --> FreightCalculatedEvent
+EventHub --> DriverMovedEvent
+@enduml

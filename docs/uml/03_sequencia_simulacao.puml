@@ -1,0 +1,18 @@
+@startuml
+queue "Kafka route" as Q
+participant EventHub as H
+participant DeliveryStartedHandler as D
+database MongoDB
+participant "Goroutine + channel" as Ch
+queue "Kafka simulation" as S
+Q -> H : DeliveryStarted
+H -> D : handleDeliveryStarted
+D -> MongoDB : buscar Route
+D -> Ch : enviar coordenadas / 1s
+Ch -> H : DriverMoved
+H -> S : publicar ponto
+note right of Ch
+Pausa de 1s e timeout de 500ms
+exigem teste contra perda de eventos.
+end note
+@enduml
