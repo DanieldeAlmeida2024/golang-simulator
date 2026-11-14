@@ -1,18 +1,32 @@
 @startuml
-queue "Kafka route" as Q
-participant EventHub as H
-participant DeliveryStartedHandler as D
-database MongoDB
-participant "Goroutine + channel" as Ch
-queue "Kafka simulation" as S
-Q -> H : DeliveryStarted
-H -> D : handleDeliveryStarted
-D -> MongoDB : buscar Route
-D -> Ch : enviar coordenadas / 1s
-Ch -> H : DriverMoved
-H -> S : publicar ponto
-note right of Ch
-Pausa de 1s e timeout de 500ms
-exigem teste contra perda de eventos.
+title DeliveryStarted — publicação completa antes do commit
+queue "Kafka route" as Input
+participant "Consumidor Kafka\n(cmd/simulator)" as Consumer
+participant "EventHub" as Hub
+participant "DeliveryStartedHandler" as Handler
+database "MongoDB routes.routes" as Mongo
+queue "Kafka simulation" as Simulation
+
+Consumer -> Input : FetchMessage(ctx)
+Input --> Consumer : DeliveryStarted
+Consumer -> Hub : HandleEvent(ctx, evento)
+Hub -> Handler : DeliveryStartedHandler(ctx, id)
+Handler -> Mongo : GetRoute(ctx, route_id)
+Mongo --> Handler : Route com direções
+Handler --> Hub : []DriverMoved em ordem
+loop Para cada direção
+    Hub -> Simulation : WriteMessages(ctx, DriverMoved)
+    Simulation --> Hub : sucesso ou erro
+    note right of Hub
+      Erro de publicação:
+      retornar falha e não confirmar offset
+    end note
+    ... intervalo de 1s entre pontos ...
+end
+Hub --> Consumer : sucesso após o último ponto
+Consumer -> Input : CommitMessages(ctx, mensagem)
+note bottom of Consumer
+  Entrega pelo menos uma vez:
+  duplicatas são possíveis em caso de crash.
 end note
 @enduml
