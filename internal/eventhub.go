@@ -25,7 +25,16 @@ func NewEventHub(routeService *RouteService, freightWriter *kafka.Writer, simula
     }
 }
 
+// MaxEventBytes caps untrusted Kafka JSON before it reaches the decoder.
+const MaxEventBytes = 256 * 1024
+
 func (eh *EventHub) HandleEvent(ctx context.Context, msg []byte) error {
+    if err := ctx.Err(); err != nil {
+        return fmt.Errorf("event canceled: %w", err)
+    }
+    if len(msg) > MaxEventBytes {
+        return fmt.Errorf("event exceeds %d bytes", MaxEventBytes)
+    }
     var baseEvent struct {
         EventName string `json:"event"`
     }

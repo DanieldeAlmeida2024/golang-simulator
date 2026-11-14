@@ -36,3 +36,16 @@ go build ./cmd/simulator
 | GO-I08 | Compose com `../mongodb` e `../kafka` | Rede, portas e dependências verificadas |
 
 **Importante:** a CI não valida as linhas GO-I. Nenhum teste de broker, banco real ou sistema externo deve ser reportado como aprovado sem logs e resultados de uma execução isolada.
+
+## GO-SIM 1.2.0 — regressões de orçamento e falha fechada
+
+| ID | Cenário | Aceitação |
+| --- | --- | --- |
+| GO-U10 | JSON com 262.145 bytes | Rejeitado antes de decodificar |
+| GO-U11 | JSON com 262.144 bytes | Continua até validação JSON |
+| GO-U12 | Rota com exatamente 600 pontos válidos | Validação aceita |
+| GO-U13 | Rota sem pontos ou com 601 pontos | Rejeitada antes de tocar no MongoDB |
+| GO-U14 | Latitude e longitude nos limites ±90 e ±180 | Aceitas; NaN, infinito e fora do intervalo rejeitados |
+| GO-U15 | Contexto cancelado antes do evento | Rejeitado antes de persistência/publicação |
+
+Todos são testes unitários de internal/handler_test.go, sem servidor Kafka/MongoDB real. A verificação completa da não confirmação de offsets, da duração de simulação e de falhas de publicação permanece no backlog de integração GO-I.

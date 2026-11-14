@@ -8,6 +8,23 @@ import (
     "strings"
 )
 
+// MaxRoutePoints bounds the sequential simulation to at most 599 one-second
+// pauses, apart from Kafka publishing latency. This is a lab safety budget.
+const MaxRoutePoints = 600
+
+func validateDirections(directions []Directions) error {
+    if len(directions) == 0 || len(directions) > MaxRoutePoints {
+        return fmt.Errorf("route requires between 1 and %d points", MaxRoutePoints)
+    }
+    for index, point := range directions {
+        if math.IsNaN(point.Lat) || math.IsInf(point.Lat, 0) || math.Abs(point.Lat) > 90 ||
+            math.IsNaN(point.Lng) || math.IsInf(point.Lng, 0) || math.Abs(point.Lng) > 180 {
+            return fmt.Errorf("invalid coordinate at point %d", index)
+        }
+    }
+    return nil
+}
+
 type RouteCreatedEvent struct {
     EventName  string       `json:"event"`
     RouteID    string       `json:"id"`
@@ -57,14 +74,11 @@ func RouteCreatedHandler(ctx context.Context, event *RouteCreatedEvent, routeSer
     if event == nil || strings.TrimSpace(event.RouteID) == "" {
         return nil, errors.New("RouteCreated: id da rota obrigatório")
     }
-    if event.Distance < 0 || len(event.Directions) == 0 {
-        return nil, errors.New("RouteCreated: distância negativa ou lista de direções vazia")
+    if event.Distance < 0 {
+        return nil, errors.New("RouteCreated: distância negativa")
     }
-    for i, ponto := range event.Directions {
-        if math.IsNaN(ponto.Lat) || math.IsInf(ponto.Lat, 0) || math.Abs(ponto.Lat) > 90 ||
-           math.IsNaN(ponto.Lng) || math.IsInf(ponto.Lng, 0) || math.Abs(ponto.Lng) > 180 {
-            return nil, fmt.Errorf("RouteCreated: coordenada inválida no ponto %d", i)
-        }
+    if err := validateDirections(event.Directions); err != nil {
+        return nil, fmt.Errorf("RouteCreated: %w", err)
     }
     route := NewRoute(event.RouteID, event.Distance, event.Directions)
     routeCreated, err := routeService.CreateRoute(ctx, route)
@@ -90,6 +104,11 @@ func DeliveryStartedHandler(ctx context.Context, event *DeliveryStartedEvent, ro
     route, err := routeService.GetRoute(ctx, event.RouteID)
     if err != nil {
         return nil, err
+    }
+    // Protect against oversized or invalid routes persisted by older versions
+    // or an external writer. Do not publish partial movement sequences.
+    if err := validateDirections(route.Directions); err != nil {
+        return nil, fmt.Errorf("DeliveryStarted: invalid stored route: %w", err)
     }
     return BuildDriverMovementEvents(route), nil
 }

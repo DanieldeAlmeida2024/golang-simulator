@@ -49,3 +49,14 @@ go run ./cmd/simulator
 - Não existe homologação integrada ou operação de produção. As variáveis e credenciais do Compose são para desenvolvimento.
 
 [Arquitetura](docs/ARQUITETURA.md) · [Especificação dos eventos](docs/projeto/ESPECIFICACAO.md) · [UML](docs/uml/README.md) · [Plano de testes](docs/testes/PLANO_DE_TESTES.md)
+
+## Limites do consumidor Kafka
+
+Para proteger o processamento sequencial e evitar que mensagens inesperadamente grandes monopolizem o consumidor:
+
+- Cada mensagem JSON recebida tem limite de **256 KiB**, conferido antes do parse.
+- Cada rota aceita entre **1 e 600 coordenadas** (até 599 pausas de um segundo, além do tempo de publicação no Kafka).
+- O mesmo limite e a validação de latitude/longitude se aplicam às direções recuperadas do MongoDB, inclusive rotas gravadas por versões antigas.
+- Um contexto cancelado interrompe o tratamento antes de operações externas.
+
+Mensagens fora do contrato retornam erro e **não têm seu offset confirmado** pelo loop consumidor. Sem DLQ, uma mensagem inválida pode bloquear o progresso de sua partição e precisa de intervenção operacional. Os limites são de laboratório; alterações para outras escalas exigem benchmark, testes de integração e revisão dos contratos nos serviços produtores.
