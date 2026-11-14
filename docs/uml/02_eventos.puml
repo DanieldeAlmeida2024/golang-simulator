@@ -1,14 +1,45 @@
 @startuml
-class Route { ID: string; Distance: int; Directions[]; FreightPrice: float64 }
-class Directions { Lat: float64; Lng: float64 }
-class RouteCreatedEvent { EventName; RouteID; Distance; Directions[] }
-class DeliveryStartedEvent { EventName; RouteID }
-class FreightCalculatedEvent { EventName; RouteID; Amount }
-class DriverMovedEvent { EventName; RouteID; Lat; Lng }
-class EventHub { HandleEvent(msg): error }
-Route o-- Directions
-EventHub --> RouteCreatedEvent
-EventHub --> DeliveryStartedEvent
-EventHub --> FreightCalculatedEvent
-EventHub --> DriverMovedEvent
+title Estruturas de eventos — Go Simulator
+class Route {
+  +ID: string
+  +Distance: int
+  +Directions: []Directions
+  +FreightPrice: float64
+}
+class Directions {
+  +Lat: float64
+  +Lng: float64
+}
+class RouteCreatedEvent {
+  +EventName: string
+  +RouteID: string
+  +Distance: int
+  +Directions: []Directions
+}
+class DeliveryStartedEvent {
+  +EventName: string
+  +RouteID: string
+}
+class FreightCalculatedEvent {
+  +EventName: string
+  +RouteID: string
+  +Amount: float64
+}
+class DriverMovedEvent {
+  +EventName: string
+  +RouteID: string
+  +Lat: float64
+  +Lng: float64
+}
+class EventHub {
+  +HandleEvent(ctx, msg): error
+  -handleRouteCreated(ctx, event): error
+  -handleDeliveryStarted(ctx, event): error
+}
+Route "1" o-- "*" Directions
+RouteCreatedEvent "1" o-- "*" Directions
+EventHub ..> RouteCreatedEvent
+EventHub ..> DeliveryStartedEvent
+EventHub ..> FreightCalculatedEvent
+EventHub ..> DriverMovedEvent
 @enduml

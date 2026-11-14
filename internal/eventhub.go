@@ -1,111 +1,105 @@
 package internal
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"time"
+    "context"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "time"
 
-	"github.com/segmentio/kafka-go"
-	"go.mongodb.org/mongo-driver/mongo"
+    "github.com/segmentio/kafka-go"
 )
 
+// EventHub só retorna sucesso depois de publicar todos os eventos derivados.
 type EventHub struct {
-	routeService        *RouteService
-	mongoClient         *mongo.Client
-	chDriverMoved       chan *DriverMovedEvent
-	chFrieghtCalculated chan *FreightCalculatedEvent
-	freightWriter       *kafka.Writer
-	simulationWriter    *kafka.Writer
+    routeService     *RouteService
+    freightWriter    *kafka.Writer
+    simulationWriter *kafka.Writer
 }
 
-func NewEventHub(
-	routeService *RouteService,
-	mongoClient *mongo.Client,
-	chDriverMoved chan *DriverMovedEvent,
-	chFreightCalculated chan *FreightCalculatedEvent,
-	freightWriter *kafka.Writer,
-	simulationWriter *kafka.Writer,
-) *EventHub {
-	return &EventHub{
-		routeService:        routeService,
-		mongoClient:         mongoClient,
-		chDriverMoved:       chDriverMoved,
-		chFrieghtCalculated: chFreightCalculated,
-		freightWriter:       freightWriter,
-		simulationWriter:    simulationWriter,
-	}
+func NewEventHub(routeService *RouteService, freightWriter *kafka.Writer, simulationWriter *kafka.Writer) *EventHub {
+    return &EventHub{
+        routeService: routeService,
+        freightWriter: freightWriter,
+        simulationWriter: simulationWriter,
+    }
 }
 
-func (eh *EventHub) HandleEvent(msg []byte) error {
-	var baseEvent struct {
-		EventName string `json:"event"`
-	}
+func (eh *EventHub) HandleEvent(ctx context.Context, msg []byte) error {
+    var baseEvent struct {
+        EventName string `json:"event"`
+    }
+    if err := json.Unmarshal(msg, &baseEvent); err != nil {
+        return fmt.Errorf("invalid JSON event: %w", err)
+    }
 
-	if err := json.Unmarshal(msg, &baseEvent); err != nil {
-		return fmt.Errorf("error unmarshaling base event: %w", err)
-	}
-
-	switch baseEvent.EventName {
-	case "RouteCreated":
-		var event RouteCreatedEvent
-		if err := json.Unmarshal(msg, &event); err != nil {
-			return fmt.Errorf("error unmarshaling RouteCreatedEvent: %w", err)
-		}
-		return eh.handleRouteCreated(event)
-
-	case "DeliveryStarted":
-		var event DeliveryStartedEvent
-		if err := json.Unmarshal(msg, &event); err != nil {
-			return fmt.Errorf("error unmarshaling DeliveryStartedEvent: %w", err)
-		}
-		return eh.handleDeliveryStarted(event)
-
-	default:
-		return errors.New("unknown event type")
-	}
+    switch baseEvent.EventName {
+    case "RouteCreated":
+        var event RouteCreatedEvent
+        if err := json.Unmarshal(msg, &event); err != nil {
+            return fmt.Errorf("invalid RouteCreated payload: %w", err)
+        }
+        return eh.handleRouteCreated(ctx, event)
+    case "DeliveryStarted":
+        var event DeliveryStartedEvent
+        if err := json.Unmarshal(msg, &event); err != nil {
+            return fmt.Errorf("invalid DeliveryStarted payload: %w", err)
+        }
+        return eh.handleDeliveryStarted(ctx, event)
+    default:
+        return errors.New("unknown event type")
+    }
 }
 
-func (eh *EventHub) handleRouteCreated(event RouteCreatedEvent) error {
-	freightCalculatedEvent, err := RouteCreatedHandler(&event, eh.routeService, eh.mongoClient)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("FreightCalculatedEvent created: %+v\n", freightCalculatedEvent)
+func (eh *EventHub) handleRouteCreated(ctx context.Context, event RouteCreatedEvent) error {
+    freight, err := RouteCreatedHandler(ctx, &event, eh.routeService)
+    if err != nil {
+        return fmt.Errorf("create route and freight: %w", err)
+    }
+    value, err := json.Marshal(freight)
+    if err != nil {
+        return fmt.Errorf("serialize freight event: %w", err)
+    }
 
-	value, _ := json.Marshal(freightCalculatedEvent)
-	if err := eh.freightWriter.WriteMessages(context.Background(), kafka.Message{
-		Key:   []byte(freightCalculatedEvent.RouteID),
-		Value: value,
-	}); err != nil {
-		fmt.Printf("Error producing FreightCalculatedEvent: %v\n", err)
-	}
-	return nil
+    writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+    defer cancel()
+    if err := eh.freightWriter.WriteMessages(writeCtx, kafka.Message{
+        Key: []byte(freight.RouteID), Value: value,
+    }); err != nil {
+        return fmt.Errorf("publish FreightCalculated to kafka: %w", err)
+    }
+    return nil
 }
 
-func (eh *EventHub) handleDeliveryStarted(event DeliveryStartedEvent) error {
-	err := DeliveryStartedHandler(&event, eh.routeService, eh.mongoClient, eh.chDriverMoved)
-	if err != nil {
-		return err
-	}
+func (eh *EventHub) handleDeliveryStarted(ctx context.Context, event DeliveryStartedEvent) error {
+    movements, err := DeliveryStartedHandler(ctx, &event, eh.routeService)
+    if err != nil {
+        return fmt.Errorf("load route for simulation: %w", err)
+    }
 
-	go func() {
-		for {
-			select {
-			case movedEvent := <-eh.chDriverMoved:
-				value, _ := json.Marshal(movedEvent)
-				if err := eh.simulationWriter.WriteMessages(context.Background(), kafka.Message{
-					Key:   []byte(movedEvent.RouteID),
-					Value: value,
-				}); err != nil {
-					fmt.Printf("Error producing DriverMovedEvent: %v\n", err)
-				}
-			case <-time.After(500 * time.Millisecond):
-				return
-			}
-		}
-	}()
+    for index, moved := range movements {
+        value, err := json.Marshal(moved)
+        if err != nil {
+            return fmt.Errorf("serialize DriverMoved: %w", err)
+        }
+        writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+        err = eh.simulationWriter.WriteMessages(writeCtx, kafka.Message{
+            Key: []byte(moved.RouteID), Value: value,
+        })
+        cancel()
+        if err != nil {
+            return fmt.Errorf("publish DriverMoved point %d: %w", index, err)
+        }
 
-	return nil
+        if index < len(movements)-1 {
+            timer := time.NewTimer(time.Second)
+            select {
+            case <-timer.C:
+            case <-ctx.Done():
+                timer.Stop()
+                return ctx.Err()
+            }
+        }
+    }
+    return nil
 }
