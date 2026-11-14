@@ -46,6 +46,9 @@ func run() error {
     }
     if err := mongoConnection.Ping(connectCtx, readpref.Primary()); err != nil {
         cancelConnect()
+        closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+        _ = mongoConnection.Disconnect(closeCtx)
+        closeCancel()
         return fmt.Errorf("MongoDB não está pronto: %w", err)
     }
     cancelConnect()
