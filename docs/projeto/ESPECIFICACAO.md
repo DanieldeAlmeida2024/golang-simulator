@@ -31,3 +31,14 @@ O arquivo `events.json` contém dois objetos de exemplo concatenados — **não*
 - Kafka e Mongo não foram levantados juntos nesta entrega; o workflow testa apenas domínio, compilação e vet.
 - O consumo sequencial limita throughput; uma simulação extensa demora `N-1` segundos apenas nas pausas.
 - `compose.yaml` importa stacks de diretórios irmãos, exigindo workspace completo.
+
+## Limites e compatibilidade v1.2.0
+
+| Contrato | Limite | Comportamento de erro |
+| --- | --- | --- |
+| JSON de entrada | 256 KiB | Recusado antes de decodificar JSON |
+| Pontos por rota | 1–600 | RouteCreated falha antes de persistir |
+| Pontos já persistidos | 1–600, com latitudes/longitudes válidas | DeliveryStarted falha antes de publicar a sequência |
+| Contexto cancelado | Não processar o evento | Erro propagado sem confirmar offset |
+
+Como o simulador aguarda um segundo entre publicações consecutivas, 600 pontos equivalem a **599 segundos apenas em pausas**. Soma-se a latência de Kafka. A configuração de limites não é um mecanismo de deduplicação nem garante progresso quando uma mensagem inválida permanecer no tópico. Os produtores NestJS e outros clientes precisam manter o mesmo orçamento antes do envio ou tratar recusas.
