@@ -1,32 +1,38 @@
 # Plano de testes — Go Simulator
 
-> **GO-SIM v1.0.0** · 11/11/2026 · código `bb46a6831ff6c5586d69c1113c52e9dd6b5348a2` · análise estática; resultados pendentes.
+**GO-SIM v1.1.0** · 14/11/2026
 
-## Cobertura observada
-Não há `*_test.go` no inventário atual. O teste `tests/test_documentacao.py` verifica somente a documentação; não valida Go, Mongo ou Kafka.
+## Executados automaticamente pelo workflow `testes-go.yml`
 
-| ID | Prioridade | Caso | Resultado esperado |
-|---|---|---|---|
-| GO-01 | P0 | FreightService 0,1,120 | Valor correto pela fórmula e arredondamento |
-| GO-02 | P0 | RouteCreated JSON válido | Upsert e FreightCalculated com route_id |
-| GO-03 | P0 | DeliveryStarted sem rota | Erro e nenhuma simulação |
-| GO-04 | P0 | Evento desconhecido | Erro `unknown event type` |
-| GO-05 | P0 | JSON malformado | Erro de deserialização sem crash |
-| GO-06 | P0 | Mongo com contexto nil | Corrigir/validar uso de contexto e timeout |
-| GO-07 | P0 | 3 direções com 1s de intervalo | 3 DriverMoved no tópico simulation |
-| GO-08 | P0 | Kafka indisponível ao publicar frete | Falha observável/retry, sem perda silenciosa |
-| GO-09 | P0 | Crash entre ReadMessage e HandleEvent | Replay sem perda de rota |
-| GO-10 | P1 | Eventos concorrentes para mesma rota | Sem goroutines vazando e com ordem definida |
-| GO-11 | P1 | SIGTERM durante simulação | Desligamento controlado de canais/brokers |
-| GO-12 | P1 | Compose com dependências de pastas irmãs | Mongo/Kafka resolvidos por DNS |
-| GO-13 | P1 | Distância negativa/grande | Política de limite explícita |
-
-## Execução de referência
 ```bash
 go test ./...
 go vet ./...
 go build ./cmd/simulator
-docker compose config
 ```
 
-Os testes de integração devem usar Mongo e Kafka isolados, confirmar quantos eventos chegaram e registrar SHA, ambientes, logs sem dados sensíveis e resultado. Os 13 casos acima permanecem **não executados** até produção de evidência.
+| ID | Condição | Esperado |
+| --- | --- | --- |
+| GO-U01 | Distâncias 0, 1, 2, 120 | Frete arredondado: 0.30, 0.45, 0.60, 18.30 |
+| GO-U02 | Rota com três coordenadas | Três `DriverMoved` com ID/ordem preservados |
+| GO-U03 | Rota sem ID, distância negativa, direções ausentes | Erro antes de qualquer chamada de banco |
+| GO-U04 | Latitude fora do intervalo ou infinito | Erro de validação |
+| GO-U05 | `DeliveryStarted` sem ID | Erro sem consulta Mongo |
+| GO-U06 | JSON inválido ou evento desconhecido | Erro sem panic |
+| GO-U07 | Serialização `DriverMoved` | Chaves JSON `event,route_id,lat,lng` |
+| GO-U08 | `MONGO_URI` ausente | Inicialização falha sem acesso externo |
+| GO-U09 | Variável de configuração vazia | Usa fallback definido |
+
+## Pendências que exigem infraestrutura de integração
+
+| ID | Condição | Resultado esperado |
+| --- | --- | --- |
+| GO-I01 | `RouteCreated` em Kafka real + Mongo | Rota gravada e um evento de frete |
+| GO-I02 | Rota com três pontos | Três `DriverMoved` com intervalo de 1s |
+| GO-I03 | Falha no writer antes de confirmar mensagem | Offset não confirmado e replay |
+| GO-I04 | Falha de Mongo no upsert | Evento sem commit; erro visível |
+| GO-I05 | Crash entre publicação e commit | Duplicata tratada pelo consumidor |
+| GO-I06 | SIGTERM durante simulação | Shutdown, sem goroutines penduradas |
+| GO-I07 | Mensagem inválida persistente | Política futura de DLQ/retry definida |
+| GO-I08 | Compose com `../mongodb` e `../kafka` | Rede, portas e dependências verificadas |
+
+**Importante:** a CI não valida as linhas GO-I. Nenhum teste de broker, banco real ou sistema externo deve ser reportado como aprovado sem logs e resultados de uma execução isolada.
