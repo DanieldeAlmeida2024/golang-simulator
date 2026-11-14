@@ -50,7 +50,7 @@ func NewFreightService() *FreightService {
 }
 
 func (fs *FreightService) Calculate(distance int) float64 {
-	return math.Floor((float64(distance)*0.15+0.3)*100) / 100
+	return math.Round((float64(distance)*0.15+0.3)*100) / 100
 }
 
 func (rs *RouteService) CreateRoute(ctx context.Context, route Route) (Route, error) {
