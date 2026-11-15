@@ -59,4 +59,8 @@ Para proteger o processamento sequencial e evitar que mensagens inesperadamente 
 - O mesmo limite e a validação de latitude/longitude se aplicam às direções recuperadas do MongoDB, inclusive rotas gravadas por versões antigas.
 - Um contexto cancelado interrompe o tratamento antes de operações externas.
 
-Mensagens fora do contrato retornam erro e **não têm seu offset confirmado** pelo loop consumidor. Sem DLQ, uma mensagem inválida pode bloquear o progresso de sua partição e precisa de intervenção operacional. Os limites são de laboratório; alterações para outras escalas exigem benchmark, testes de integração e revisão dos contratos nos serviços produtores.
+Eventos permanentemente inválidos são publicados no tópico separado `route-dlq` antes de o offset de origem ser confirmado. Falhas transitórias de banco, publicação e cancelamento NÃO vão para a DLQ e continuam sem confirmação. Sem broker real a CI valida apenas ordem e falha de commit com mocks; exigem-se benchmark, E2E, retenção/ACL do tópico de quarentena e revisão dos contratos para outras escalas.
+
+## Dead-letter queue para mensagens irrecuperáveis
+
+`KAFKA_DLQ_TOPIC=route-dlq` (padrão) define um tópico dedicado criado pelo Compose do repositório `kafka`. O consumidor identifica JSON malformado, eventos desconhecidos e campos estruturais permanentemente inválidos; publica mensagem original e metadados da partição/offset na DLQ, aguardando confirmação do broker antes do commit da origem. Falha de envio à DLQ interrompe sem confirmar offset. **Falha ao confirmar offset após escrever na DLQ poderá duplicar mensagens**; as rotinas de triagem devem ser idempotentes. Erros de MongoDB/Kafka nos fluxos de negócio não são automaticamente descartados. Não enviar payloads sensíveis a logs, revisar retenção e acesso antes de produção.
