@@ -3,6 +3,7 @@ package internal
 import (
     "context"
     "encoding/json"
+    "errors"
     "math"
     "strings"
     "testing"
@@ -137,5 +138,28 @@ func TestHubRespeitaCancelamentoAntesDeProcessar(t *testing.T) {
     hub := &EventHub{}
     if err := hub.HandleEvent(ctx, []byte(`{"event":"RouteCreated"}`)); err == nil {
         t.Fatal("canceled context was accepted")
+    }
+}
+
+
+func TestInvalidEventClassificationIsPermanentOnlyForContract(t *testing.T) {
+    hub := &EventHub{}
+    cases := [][]byte{
+        []byte("{"),
+        []byte(`{"event":"unknown"}`),
+        []byte(`{"event":"RouteCreated","id":"","distance":1,"directions":[{"lat":0,"lng":0}]}`),
+        []byte(`{"event":"DeliveryStarted","route_id":""}`),
+        make([]byte, MaxEventBytes+1),
+    }
+    for _, body := range cases {
+        err := hub.HandleEvent(context.Background(), body)
+        if !errors.Is(err, ErrInvalidEvent) {
+            t.Fatalf("invalid message must classify as permanent: %v", err)
+        }
+    }
+    ctx, cancel := context.WithCancel(context.Background())
+    cancel()
+    if errors.Is(hub.HandleEvent(ctx, []byte(`{"event":"RouteCreated"}`)), ErrInvalidEvent) {
+        t.Fatal("cancellation is transient; must not be silently quarantined")
     }
 }
