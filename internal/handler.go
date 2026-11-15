@@ -69,16 +69,24 @@ func NewDriverMovedEvent(routeID string, lat float64, lng float64) *DriverMovedE
     return &DriverMovedEvent{EventName: "DriverMoved", RouteID: routeID, Lat: lat, Lng: lng}
 }
 
-// RouteCreatedHandler valida o evento antes de tocar no banco de dados.
-func RouteCreatedHandler(ctx context.Context, event *RouteCreatedEvent, routeService *RouteService) (*FreightCalculatedEvent, error) {
+// Regras puras reaproveitadas pelo consumidor para classificar erros permanentes.
+func validateRouteCreatedEvent(event *RouteCreatedEvent) error {
     if event == nil || strings.TrimSpace(event.RouteID) == "" {
-        return nil, errors.New("RouteCreated: id da rota obrigatório")
+        return errors.New("RouteCreated: id da rota obrigatório")
     }
     if event.Distance < 0 {
-        return nil, errors.New("RouteCreated: distância negativa")
+        return errors.New("RouteCreated: distância negativa")
     }
     if err := validateDirections(event.Directions); err != nil {
-        return nil, fmt.Errorf("RouteCreated: %w", err)
+        return fmt.Errorf("RouteCreated: %w", err)
+    }
+    return nil
+}
+
+// RouteCreatedHandler valida o evento antes de tocar no banco de dados.
+func RouteCreatedHandler(ctx context.Context, event *RouteCreatedEvent, routeService *RouteService) (*FreightCalculatedEvent, error) {
+    if err := validateRouteCreatedEvent(event); err != nil {
+        return nil, err
     }
     route := NewRoute(event.RouteID, event.Distance, event.Directions)
     routeCreated, err := routeService.CreateRoute(ctx, route)
@@ -97,9 +105,16 @@ func BuildDriverMovementEvents(route Route) []*DriverMovedEvent {
     return movimentos
 }
 
-func DeliveryStartedHandler(ctx context.Context, event *DeliveryStartedEvent, routeService *RouteService) ([]*DriverMovedEvent, error) {
+func validateDeliveryStartedEvent(event *DeliveryStartedEvent) error {
     if event == nil || strings.TrimSpace(event.RouteID) == "" {
-        return nil, errors.New("DeliveryStarted: id da rota obrigatório")
+        return errors.New("DeliveryStarted: id da rota obrigatório")
+    }
+    return nil
+}
+
+func DeliveryStartedHandler(ctx context.Context, event *DeliveryStartedEvent, routeService *RouteService) ([]*DriverMovedEvent, error) {
+    if err := validateDeliveryStartedEvent(event); err != nil {
+        return nil, err
     }
     route, err := routeService.GetRoute(ctx, event.RouteID)
     if err != nil {

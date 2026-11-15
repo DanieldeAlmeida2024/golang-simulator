@@ -32,7 +32,7 @@ go build ./cmd/simulator
 | GO-I04 | Falha de Mongo no upsert | Evento sem commit; erro visível |
 | GO-I05 | Crash entre publicação e commit | Duplicata tratada pelo consumidor |
 | GO-I06 | SIGTERM durante simulação | Shutdown, sem goroutines penduradas |
-| GO-I07 | Mensagem inválida persistente | Política futura de DLQ/retry definida |
+| GO-I07 | Mensagem inválida persistente | Política de DLQ implementada e testada com injeção de dependências; execução real em broker ainda pendente |
 | GO-I08 | Compose com `../mongodb` e `../kafka` | Rede, portas e dependências verificadas |
 
 **Importante:** a CI não valida as linhas GO-I. Nenhum teste de broker, banco real ou sistema externo deve ser reportado como aprovado sem logs e resultados de uma execução isolada.
@@ -49,3 +49,15 @@ go build ./cmd/simulator
 | GO-U15 | Contexto cancelado antes do evento | Rejeitado antes de persistência/publicação |
 
 Todos são testes unitários de internal/handler_test.go, sem servidor Kafka/MongoDB real. A verificação completa da não confirmação de offsets, da duração de simulação e de falhas de publicação permanece no backlog de integração GO-I.
+
+## GO-DLQ-01..05 — política de mensagens incompatíveis
+
+| ID | Condição | Aceitação automatizada |
+| --- | --- | --- |
+| GO-DLQ-01 | Evento com JSON inválido, tipo desconhecido ou rota sem ID | Marcado como `ErrInvalidEvent` |
+| GO-DLQ-02 | Mensagem incompatível com publicação confirmada em route-dlq | Depois, e somente depois, confirmação do offset |
+| GO-DLQ-03 | Erro do writer da DLQ | Offset não confirmado |
+| GO-DLQ-04 | Erro de Mongo/cancelamento/publicação normal | Não vai para DLQ e não confirma offset |
+| GO-DLQ-05 | Evento válido | Commit normal sem produzir DLQ |
+
+Testes isolados com callbacks, sem Kafka/Mongo reais. Duplicação da DLQ em crash entre publish e commit, políticas ACL/TLS/retenção, observabilidade e reprocessamento manual exigem homologação E2E.
