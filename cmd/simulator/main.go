@@ -115,7 +115,9 @@ func run() error {
                 defer cancel()
                 return deadLetterWriter.WriteMessages(writeCtx, msg)
             },
-            routeReader.CommitMessages)
+            func(ctx context.Context, msg kafka.Message) error {
+                return routeReader.CommitMessages(ctx, msg)
+            })
         if err != nil {
             return fmt.Errorf("processar evento Kafka partition=%d offset=%d: %w",
                 message.Partition, message.Offset, err)
