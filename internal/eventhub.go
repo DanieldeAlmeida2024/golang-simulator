@@ -28,35 +28,45 @@ func NewEventHub(routeService *RouteService, freightWriter *kafka.Writer, simula
 // MaxEventBytes caps untrusted Kafka JSON before it reaches the decoder.
 const MaxEventBytes = 256 * 1024
 
+// ErrInvalidEvent only marks permanent failures of an incoming event contract.
+// Mongo, Kafka publish, and cancellation errors must never enter the DLQ automatically.
+var ErrInvalidEvent = errors.New("permanently invalid route event")
+
 func (eh *EventHub) HandleEvent(ctx context.Context, msg []byte) error {
     if err := ctx.Err(); err != nil {
         return fmt.Errorf("event canceled: %w", err)
     }
     if len(msg) > MaxEventBytes {
-        return fmt.Errorf("event exceeds %d bytes", MaxEventBytes)
+        return fmt.Errorf("%w: event exceeds %d bytes", ErrInvalidEvent, MaxEventBytes)
     }
     var baseEvent struct {
         EventName string `json:"event"`
     }
     if err := json.Unmarshal(msg, &baseEvent); err != nil {
-        return fmt.Errorf("invalid JSON event: %w", err)
+        return fmt.Errorf("%w: invalid JSON event: %v", ErrInvalidEvent, err)
     }
 
     switch baseEvent.EventName {
     case "RouteCreated":
         var event RouteCreatedEvent
         if err := json.Unmarshal(msg, &event); err != nil {
-            return fmt.Errorf("invalid RouteCreated payload: %w", err)
+            return fmt.Errorf("%w: invalid RouteCreated payload: %v", ErrInvalidEvent, err)
+        }
+        if err := validateRouteCreatedEvent(&event); err != nil {
+            return fmt.Errorf("%w: %v", ErrInvalidEvent, err)
         }
         return eh.handleRouteCreated(ctx, event)
     case "DeliveryStarted":
         var event DeliveryStartedEvent
         if err := json.Unmarshal(msg, &event); err != nil {
-            return fmt.Errorf("invalid DeliveryStarted payload: %w", err)
+            return fmt.Errorf("%w: invalid DeliveryStarted payload: %v", ErrInvalidEvent, err)
+        }
+        if err := validateDeliveryStartedEvent(&event); err != nil {
+            return fmt.Errorf("%w: %v", ErrInvalidEvent, err)
         }
         return eh.handleDeliveryStarted(ctx, event)
     default:
-        return errors.New("unknown event type")
+        return fmt.Errorf("%w: unknown event type", ErrInvalidEvent)
     }
 }
 
