@@ -37,6 +37,11 @@ func run() error {
     kafkaFreightTopic := getEnv("KAFKA_FREIGHT_TOPIC", "freight")
     kafkaSimulationTopic := getEnv("KAFKA_SIMULATION_TOPIC", "simulation")
     kafkaGroupID := getEnv("KAFKA_GROUP_ID", "route-group")
+    kafkaDLQTopic := getEnv("KAFKA_DLQ_TOPIC", "route-dlq")
+    if kafkaDLQTopic == kafkaRouteTopic || kafkaDLQTopic == kafkaFreightTopic ||
+        kafkaDLQTopic == kafkaSimulationTopic {
+        return errors.New("KAFKA_DLQ_TOPIC deve ser diferente dos tópicos de entrada e saída")
+    }
 
     connectCtx, cancelConnect := context.WithTimeout(ctx, 10*time.Second)
     mongoConnection, err := mongo.Connect(connectCtx, options.Client().ApplyURI(mongoURI))
@@ -74,6 +79,14 @@ func run() error {
     }
     defer simulationWriter.Close()
 
+    // Quarentena de eventos permanentes, nunca dos erros de Mongo/rede/publicação.
+    deadLetterWriter := &kafka.Writer{
+        Addr: kafka.TCP(kafkaBroker),
+        Topic: kafkaDLQTopic,
+        Balancer: &kafka.LeastBytes{},
+    }
+    defer deadLetterWriter.Close()
+
     routeReader := kafka.NewReader(kafka.ReaderConfig{
         Brokers: []string{kafkaBroker},
         Topic: kafkaRouteTopic,
@@ -94,15 +107,22 @@ func run() error {
             return fmt.Errorf("buscar evento Kafka: %w", err)
         }
 
-        // Não confirmar offset antes de Mongo e publicações serem concluídos.
-        // Falhas encerram o processo sem commit; replay é at-least-once.
-        if err := hub.HandleEvent(ctx, message.Value); err != nil {
+        // A origem só é confirmada após processamento OU publicação confirmada na DLQ.
+        // Erros transitórios de Mongo/Kafka permanecem sem commit para replay.
+        quarantined, err := processKafkaRecord(ctx, message, hub.HandleEvent,
+            func(ctx context.Context, msg kafka.Message) error {
+                writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+                defer cancel()
+                return deadLetterWriter.WriteMessages(writeCtx, msg)
+            },
+            routeReader.CommitMessages)
+        if err != nil {
             return fmt.Errorf("processar evento Kafka partition=%d offset=%d: %w",
                 message.Partition, message.Offset, err)
         }
-        if err := routeReader.CommitMessages(ctx, message); err != nil {
-            return fmt.Errorf("confirmar evento Kafka partition=%d offset=%d: %w",
-                message.Partition, message.Offset, err)
+        if quarantined {
+            log.Printf("evento incompatível isolado em %s partition=%d offset=%d",
+                kafkaDLQTopic, message.Partition, message.Offset)
         }
     }
 }
@@ -112,4 +132,42 @@ func getEnv(key, fallback string) string {
         return value
     }
     return fallback
+}
+
+
+// processKafkaRecord separates permanent message defects from transient service failures.
+// An invalid message is acknowledged only after the DLQ broker confirms the write.
+func processKafkaRecord(
+    ctx context.Context,
+    message kafka.Message,
+    handle func(context.Context, []byte) error,
+    publishDLQ func(context.Context, kafka.Message) error,
+    commit func(context.Context, kafka.Message) error,
+) (bool, error) {
+    err := handle(ctx, message.Value)
+    if err != nil {
+        if !errors.Is(err, internal.ErrInvalidEvent) {
+            return false, err
+        }
+        quarantined := kafka.Message{
+            Key: append([]byte(nil), message.Key...),
+            Value: append([]byte(nil), message.Value...),
+            Headers: []kafka.Header{
+                {Key: "source-topic", Value: []byte(message.Topic)},
+                {Key: "source-partition", Value: []byte(fmt.Sprint(message.Partition))},
+                {Key: "source-offset", Value: []byte(fmt.Sprint(message.Offset))},
+            },
+        }
+        if writeErr := publishDLQ(ctx, quarantined); writeErr != nil {
+            return false, fmt.Errorf("DLQ indisponível, offset preservado: %w", writeErr)
+        }
+        if commitErr := commit(ctx, message); commitErr != nil {
+            return false, fmt.Errorf("DLQ publicada, offset sem confirmação: %w", commitErr)
+        }
+        return true, nil
+    }
+    if commitErr := commit(ctx, message); commitErr != nil {
+        return false, fmt.Errorf("offset não confirmado: %w", commitErr)
+    }
+    return false, nil
 }
