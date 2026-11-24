@@ -45,7 +45,7 @@ go run ./cmd/simulator
 - O consumidor usa `FetchMessage` e `CommitMessages`: uma falha do processamento **não confirma o offset**.
 - As publicações no Kafka têm timeout e propagam erros; a consulta Mongo também tem deadline.
 - **Entrega pelo menos uma vez (at-least-once), não exatamente uma vez.** Falhas entre publicar e confirmar podem produzir eventos duplicados. Consumidores devem tratar idempotência.
-- Eventos inválidos/paradas de dependências interrompem o processo, deixando a mensagem sem commit; ainda faltam retries com backoff e fila de mensagens inválidas (DLQ).
+- Frete, simulação e DLQ aguardam a confirmação das réplicas em sincronia do Kafka (`RequireAll`). Falha de publicação deixa a origem sem commit. O consumidor ainda não tem política própria de reprocessamento com backoff.
 - Não existe homologação integrada ou operação de produção. As variáveis e credenciais do Compose são para desenvolvimento.
 
 [Arquitetura](docs/ARQUITETURA.md) · [Especificação dos eventos](docs/projeto/ESPECIFICACAO.md) · [UML](docs/uml/README.md) · [Plano de testes](docs/testes/PLANO_DE_TESTES.md)

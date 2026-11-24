@@ -27,7 +27,7 @@ O arquivo `events.json` contém dois objetos de exemplo concatenados — **não*
 
 ## Limites de confiabilidade
 
-- At-least-once, sujeito a duplicatas. Não há outbox transacional, deduplicação por ID, DLQ nem idempotência do produtor.
+- Entrega pelo menos uma vez, sujeita a duplicatas. A DLQ recebe eventos permanentemente inválidos e exige confirmação Kafka antes do commit da origem. Outbox transacional, deduplicação por ID e idempotência do produtor seguem pendentes.
 - Kafka e Mongo não foram levantados juntos nesta entrega; o workflow testa apenas domínio, compilação e vet.
 - O consumo sequencial limita throughput; uma simulação extensa demora `N-1` segundos apenas nas pausas.
 - `compose.yaml` importa stacks de diretórios irmãos, exigindo workspace completo.

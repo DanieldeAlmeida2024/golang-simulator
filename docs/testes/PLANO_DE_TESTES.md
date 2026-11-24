@@ -61,3 +61,7 @@ Todos são testes unitários de internal/handler_test.go, sem servidor Kafka/Mon
 | GO-DLQ-05 | Evento válido | Commit normal sem produzir DLQ |
 
 Testes isolados com callbacks, sem Kafka/Mongo reais. Duplicação da DLQ em crash entre publish e commit, políticas ACL/TLS/retenção, observabilidade e reprocessamento manual exigem homologação E2E.
+
+## GO-SIM 1.3.0 — configuração das publicações
+
+**GO-U16:** os produtores de frete, simulação e DLQ usam `RequireAll` e modo síncrono. O cenário `TestKafkaWriterExigeConfirmacaoSincrona` valida a configuração sem broker. Os testes GO-DLQ verificam separadamente a ordem entre publicação e commit e o comportamento em caso de erro.

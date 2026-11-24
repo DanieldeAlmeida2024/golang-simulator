@@ -1,5 +1,11 @@
 # Histórico documental — Go Simulator
 
+## GO-SIM 1.3.0 · 24/11/2026
+
+- Os produtores de frete, simulação e DLQ agora aguardam confirmação Kafka com `RequireAll`.
+- O caso GO-U16 verifica a configuração dos três produtores. O [plano de testes](../testes/PLANO_DE_TESTES.md) mantém a homologação com Kafka/Mongo reais como pendência.
+- A documentação corrente passa a refletir a DLQ já adicionada no [PR #7](https://github.com/DanieldeAlmeida2024/golang-simulator/pull/7), incluindo a ordem entre publicação e confirmação da origem.
+
 ## GO-SIM 1.1.0 · 14/11/2026
 
 - Corrigidos commit prematuro de offsets, perda de erros de publicação e o encerramento do listener após 500 ms.

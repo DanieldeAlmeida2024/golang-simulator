@@ -1,10 +1,10 @@
 # Arquitetura — Go Simulator
 
-Versão 1.1.0 — 14/11/2026
+Versão 1.3.0 — 24/11/2026
 
 ## Processamento de um evento
 
-`cmd/simulator/main.go` inicializa MongoDB (conexão + ping), leitores/escritores Kafka e tratamento de SIGTERM. O reader usa `FetchMessage(ctx)`, chama `EventHub.HandleEvent(ctx,payload)` **sincronamente** e apenas após sucesso chama `CommitMessages(ctx,message)`.
+`cmd/simulator/main.go` inicializa MongoDB, o consumidor Kafka e o tratamento de SIGTERM. Frete, simulação e DLQ compartilham a configuração de publicação síncrona com `RequireAll`, que aguarda as réplicas em sincronia. O consumidor confirma a origem após publicar os eventos derivados ou após publicar na DLQ um evento permanentemente inválido.
 
 `internal/eventhub.go` publica cada resultado com deadline de 10 segundos. Publicação malsucedida vira erro propagado ao consumidor, encerrando sem commit. Para `DeliveryStarted`, cada coordenada gera um `DriverMoved`, em sequência, com pausa de um segundo entre publicações. Não usa canal sem consumidor ou temporizador de 500 ms.
 
@@ -23,4 +23,4 @@ Versão 1.1.0 — 14/11/2026
 
 O offset **não é confirmado** quando banco ou escritor falha. Isso reduz perda silenciosa, mas não fornece outbox transacional nem exatamente-uma-vez. Uma falha depois de publicar um evento derivado, mas antes de confirmar o original, pode gerar duplicidade ao reiniciar.
 
-O consumo serial por partição bloqueia enquanto uma rota longa é simulada; throughput, DLQ, backoff e idempotência de consumidores permanecem pendentes. O serviço retorna erro para payload inválido e depende de um supervisor externo para política de restart. O Compose usa recursos de pastas irmãs.
+O consumo serial fica ocupado enquanto uma rota longa é simulada. Falhas transitórias e falhas de envio para a DLQ encerram o consumo sem confirmar a mensagem de origem. A política de reinício depende do supervisor externo. Vazão, validação com broker real, reprocessamento com backoff no consumidor e idempotência permanecem pendentes. O Compose usa recursos de pastas irmãs.

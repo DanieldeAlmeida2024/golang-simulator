@@ -31,6 +31,17 @@ func TestGetEnvUsaFallbackParaVazio(t *testing.T) {
 }
 
 
+func TestKafkaWriterExigeConfirmacaoSincrona(t *testing.T) {
+    for _, topic := range []string{"freight", "simulation", "route-dlq"} {
+        t.Run(topic, func(t *testing.T) {
+            writer := newKafkaWriter("localhost:9092", topic)
+            if writer.Topic != topic || writer.RequiredAcks != kafka.RequireAll || writer.Async {
+                t.Fatalf("topic=%q acks=%v async=%v", writer.Topic, writer.RequiredAcks, writer.Async)
+            }
+        })
+    }
+}
+
 func TestDLQConfirmaSomenteAposPublicacao(t *testing.T) {
     message := kafka.Message{
         Topic: "route", Partition: 3, Offset: 71,

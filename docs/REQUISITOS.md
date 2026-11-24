@@ -6,8 +6,8 @@
 - **RF02:** persistir/atualizar rota e preço no MongoDB antes de publicar `FreightCalculated`.
 - **RF03:** receber `DeliveryStarted` e recuperar uma rota persistida.
 - **RF04:** publicar `DriverMoved` seguindo a ordem das direções com intervalo de aproximadamente um segundo.
-- **RF05:** confirmar offsets Kafka somente após a publicação integral dos eventos derivados.
-- **RF06:** rejeitar eventos JSON inválidos, de tipo desconhecido ou com IDs ausentes.
+- **RF05:** confirmar o offset de origem após confirmação de todos os eventos derivados pelo Kafka. Para eventos permanentemente inválidos, confirmar a origem após publicação confirmada na DLQ.
+- **RF06:** classificar JSON inválido, eventos desconhecidos e IDs ausentes como falhas permanentes e encaminhá-los à DLQ.
 
 ## Não funcionais
 
@@ -19,7 +19,7 @@
 
 ## Restrições conhecidas
 
-O sistema entrega mensagens **pelo menos uma vez** (pode repetir eventos), não tem DLQ, retry com backoff, outbox transacional nem testes E2E Mongo/Kafka. O consumo sequencial exige avaliação de throughput antes de uso real.
+O sistema entrega mensagens **pelo menos uma vez** e pode repetir eventos. Reprocessamento com backoff no consumidor, outbox transacional e testes E2E Mongo/Kafka seguem pendentes. O consumo sequencial exige avaliação de vazão antes de uso real.
 
 [Especificação dos eventos](projeto/ESPECIFICACAO.md) · [Plano de testes](testes/PLANO_DE_TESTES.md)
 
@@ -30,4 +30,7 @@ O sistema entrega mensagens **pelo menos uma vez** (pode repetir eventos), não 
 - **RNF08:** validar também coordenadas provenientes do MongoDB antes de gerar eventos de movimento.
 - **RNF09:** respeitar o cancelamento do contexto antes de iniciar o tratamento de um evento.
 
-**Política de erro:** a versão não introduz DLQ e mantém entrega pelo menos uma vez (at-least-once). Mensagens inválidas interrompem o consumidor sem commit e podem exigir quarentena ou correção no produtor.
+## Confirmação de publicações — GO-SIM v1.3.0
+
+- **RNF10:** usar publicação Kafka síncrona e `RequireAll` nos tópicos de frete, simulação e DLQ.
+- **RNF11:** preservar o offset de origem quando a publicação falhar. Erros transitórios permanecem no fluxo de reprocessamento.
