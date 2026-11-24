@@ -65,26 +65,14 @@ func run() error {
         }
     }()
 
-    freightWriter := &kafka.Writer{
-        Addr: kafka.TCP(kafkaBroker),
-        Topic: kafkaFreightTopic,
-        Balancer: &kafka.LeastBytes{},
-    }
+    freightWriter := newKafkaWriter(kafkaBroker, kafkaFreightTopic)
     defer freightWriter.Close()
 
-    simulationWriter := &kafka.Writer{
-        Addr: kafka.TCP(kafkaBroker),
-        Topic: kafkaSimulationTopic,
-        Balancer: &kafka.LeastBytes{},
-    }
+    simulationWriter := newKafkaWriter(kafkaBroker, kafkaSimulationTopic)
     defer simulationWriter.Close()
 
     // Quarentena de eventos permanentes, nunca dos erros de Mongo/rede/publicação.
-    deadLetterWriter := &kafka.Writer{
-        Addr: kafka.TCP(kafkaBroker),
-        Topic: kafkaDLQTopic,
-        Balancer: &kafka.LeastBytes{},
-    }
+    deadLetterWriter := newKafkaWriter(kafkaBroker, kafkaDLQTopic)
     defer deadLetterWriter.Close()
 
     routeReader := kafka.NewReader(kafka.ReaderConfig{
@@ -126,6 +114,16 @@ func run() error {
             log.Printf("evento incompatível isolado em %s partition=%d offset=%d",
                 kafkaDLQTopic, message.Partition, message.Offset)
         }
+    }
+}
+
+// Os três fluxos dependem da confirmação do broker antes de confirmar a origem.
+func newKafkaWriter(broker, topic string) *kafka.Writer {
+    return &kafka.Writer{
+        Addr:         kafka.TCP(broker),
+        Topic:        topic,
+        Balancer:     &kafka.LeastBytes{},
+        RequiredAcks: kafka.RequireAll,
     }
 }
 
